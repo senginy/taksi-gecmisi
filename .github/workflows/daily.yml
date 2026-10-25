@@ -1,0 +1,51 @@
+name: Taksi geçmişi (günlük)
+on:
+  schedule:
+    - cron: '30 8 * * *'   # 08:30 UTC; adsb.lol bir önceki günü ~06:30 UTC'de yayımlıyor
+  workflow_dispatch:
+    inputs:
+      day:
+        description: 'Tek gün (YYYY-MM-DD); boş bırakılırsa son 10 günün eksikleri'
+        required: false
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: taksi
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install orjson
+      - name: Önceki günleri yükle (state dalı)
+        run: |
+          mkdir -p work/days
+          if git ls-remote --exit-code origin state >/dev/null; then git fetch --depth 1 origin state && git archive FETCH_HEAD | tar -x -C work/days; fi
+          ls work/days || true
+      - name: Günleri işle
+        run: scripts/run_days.sh work/days "${{ inputs.day }}"
+      - name: Site verisini üret
+        run: |
+          mkdir -p site && cp web/* site/ 2>/dev/null || true
+          python3 scripts/aggregate.py work/days site /tmp/runways.csv 10
+          touch site/.nojekyll
+      - name: State dalını güncelle
+        run: |
+          cd work/days && git init -q && git checkout -q -b state && git add -A
+          git -c user.name=taksi-bot -c user.email=taksi-bot@users.noreply.github.com commit -qm "state $(date -u +%F)"
+          git push -fq "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" state
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: '${{ steps.d.outputs.page_url }}' }
+    steps:
+      - id: d
+        uses: actions/deploy-pages@v4
