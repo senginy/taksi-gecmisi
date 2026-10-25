@@ -9,8 +9,6 @@ on:
         required: false
 permissions:
   contents: write
-  pages: write
-  id-token: write
 concurrency:
   group: taksi
   cancel-in-progress: false
@@ -40,12 +38,8 @@ jobs:
           cd work/days && git init -q && git checkout -q -b state && git add -A
           git -c user.name=taksi-bot -c user.email=taksi-bot@users.noreply.github.com commit -qm "state $(date -u +%F)"
           git push -fq "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" state
-      - uses: actions/upload-pages-artifact@v3
-        with: { path: site }
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment: { name: github-pages, url: '${{ steps.d.outputs.page_url }}' }
-    steps:
-      - id: d
-        uses: actions/deploy-pages@v4
+      - name: Site dalını güncelle
+        run: |
+          cd site && git init -q && git checkout -q -b site && git add -A
+          git -c user.name=taksi-bot -c user.email=taksi-bot@users.noreply.github.com commit -qm "site $(date -u +%F)"
+          git push -fq "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" site

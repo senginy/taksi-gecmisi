@@ -1,13 +1,11 @@
 # Taksi Geçmişi
 
-Uçuş Paketi Asistanı’nın **Taksi** sekmesine veri üretir. Her gün adsb.lol’un açık ADS-B arşivinden bir önceki günü indirir; THY B777-300ER, B787-9 ve B777F filosunun (`data/fleet.json`, DOW/DOI tablolarındaki tesciller) meydanlardaki yer hareketlerini çıkarır, son 10 günü tutar ve GitHub Pages’te yayımlar.
+Uçuş Paketi Asistanı’nın **Taksi** sekmesine veri üretir. Her gün adsb.lol’un açık ADS-B arşivinden bir önceki günü indirir; THY B777-300ER, B787-9 ve B777F filosunun (`data/fleet.json`, DOW/DOI tablolarındaki tesciller) meydanlardaki yer hareketlerini çıkarır, son 10 günü tutar ve `site` dalında yayımlar.
 
 ## Kurulum (bir kez)
-1. GitHub’da **herkese açık** yeni bir depo aç (ör. `taksi-gecmisi`). Herkese açık depoda Actions dakikaları ücretsizdir.
-2. Bu klasördeki her şeyi depoya yükle (`.github/workflows/daily.yml` dahil).
-3. Depo → **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-4. Depo → **Actions → “Taksi geçmişi (günlük)” → Run workflow** (gün alanı boş). İlk çalıştırma son 10 günü işler, ~45–60 dk sürer. Sonraki günlerde her sabah 08:30 UTC’de kendiliğinden çalışır (~5 dk).
-5. Yayın adresi: `https://<kullanıcı-adın>.github.io/<depo-adı>/`. Bu adresi uygulamada Taksi sekmesine bir kez gir.
+1. Herkese açık depo (Actions dakikaları ücretsiz).
+2. Depo → **Actions → “Taksi geçmişi (günlük)” → Run workflow** (gün alanı boş). İlk çalıştırma son 10 günü işler, ~45–60 dk sürer. Sonraki günlerde her sabah 08:30 UTC’de kendiliğinden çalışır (~5 dk).
+3. Veri `site` dalına yazılır; uygulama `https://raw.githubusercontent.com/senginy/taksi-gecmisi/site/` adresinden okur (Pages gerekmez).
 
 ## Nasıl çalışır
 - `scripts/process_day.py`: Günlük arşivden (~4 GB) yalnız Türk tescil bloğundaki (4B8000–4BFFFF) iz dosyalarını açar, filo uçaklarının yer oturumlarını ayırır (iniş / kalkış, callsign, 8 m hücre). Ardından aynı meydanlardaki tüm trafiğin yer izlerinden taksi yolu ağı zeminini sayar.
