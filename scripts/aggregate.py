@@ -21,7 +21,7 @@ for fn in files:
 # pistler (OurAirports): yerel metre
 rw = {}
 for r in csv.reader(open(RWY, encoding='utf-8')):
-    if r[2] in ads and r[9] and r[15] and r[6] != '1':
+    if r[2] in ads and r[9] and r[15] and r[7] != '1':
         rw.setdefault(r[2], []).append(r)
 def proj(ref):
     la0, lo0 = ref; kx = math.cos(math.radians(la0)) * 111320; ky = 110540
