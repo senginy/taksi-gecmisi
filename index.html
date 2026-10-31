@@ -1,0 +1,8 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Taksi Geçmişi Verisi</title>
+<style>body{font:15px/1.5 system-ui,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;color:#14202A;background:#F8FAFB}@media(prefers-color-scheme:dark){body{background:#11191F;color:#E3E9ED}}code{font-size:.9em}</style></head><body>
+<h1>Taksi Geçmişi Verisi</h1>
+<p>Uçuş Paketi Asistanı’nın Taksi sekmesi için veri. THY B777-300ER, B787-9 ve B777F filosunun son 10 gündeki yer hareketleri, meydan ve ATC callsign’ına göre.</p>
+<p>Güncelleme: <span id="u">…</span> · Meydan sayısı: <span id="n">…</span></p>
+<p>Kaynaklar: <a href="https://github.com/adsblol">adsb.lol</a> açık ADS-B arşivi (ODbL), pistler <a href="https://ourairports.com/data/">OurAirports</a> (public domain). Resmi doküman değildir.</p>
+<script>fetch('index.json').then(r=>r.json()).then(d=>{u.textContent=d.updated+' ('+d.days[0]+' – '+d.days[d.days.length-1]+')';n.textContent=Object.keys(d.ads).length;});</script>
+</body></html>
