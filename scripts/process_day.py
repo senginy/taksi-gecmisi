@@ -13,18 +13,20 @@ fleet = json.load(open(FLEET))
 CELL = 8          # m
 GAP = 1200        # s; yer oturumlarını ayıran boşluk
 R_AD = 6000       # m; meydan yarıçapı
+R_AIR = 15000     # m; yer izi yoksa son yaklaşma / ilk tırmanış için yarıçap
+ALT_AIR = 1500    # ft; bu irtifanın altındaki hava noktaları pist tahmini için
 # meydanlar: tarifeli seferi olan büyük/orta meydanlar
 APTS = []
 for r in csv.DictReader(open(APT, encoding='utf-8')):
     if r['type'] in ('large_airport', 'medium_airport') and r['scheduled_service'] == 'yes' and r['ident'] and len(r['ident']) == 4:
         APTS.append((r['ident'], float(r['latitude_deg']), float(r['longitude_deg'])))
-def nearest(la, lo):
-    best = None
+def nearest(la, lo, rad=None):
+    rad = rad or R_AD; best = None
     for ic, a, b in APTS:
         if abs(a - la) > 0.2 or abs(b - lo) > 0.3: continue
         d = math.hypot((b - lo) * math.cos(math.radians(la)) * 111320, (a - la) * 110540)
         if best is None or d < best[0]: best = (d, ic, a, b)
-    return best if best and best[0] < R_AD else None
+    return best if best and best[0] < rad else None
 def proj(ref):
     la0, lo0 = ref; kx = math.cos(math.radians(la0)) * 111320; ky = 110540
     return lambda la, lo: ((lo - lo0) * kx, (la - la0) * ky)
@@ -86,6 +88,29 @@ with tarfile.open(TAR, 'r:') as tf:
             ends = (G[:12] if kind == 'arr' else G[-12:])
             flights.append({'ad': ic, 'kind': kind, 'cs': call, 'reg': reg, 'type': fleet[reg], 't0': int(G[0][0]), 't1': int(G[-1][0]),
                             'cells': sorted(c), 'end': [[round(v) for v in P(p[1], p[2])] for p in ends]})
+        # yer kapsaması olmayan meydanlar: son yaklaşma / ilk tırmanış noktalarından pist (yer izi yoksa)
+        gt = [p[0] for p in pts if p[3] == 'ground']
+        low = [p for p in pts if isinstance(p[3], (int, float)) and p[3] <= ALT_AIR and p[1] is not None]
+        runs = []; cur = []
+        for p in low:
+            if cur and (p[0] - cur[-1][0] > 180): runs.append(cur); cur = []
+            cur.append(p)
+        if cur: runs.append(cur)
+        for G in runs:
+            if len(G) < 4: continue
+            na = nearest(G[len(G) // 2][1], G[len(G) // 2][2], R_AIR)
+            if not na: continue
+            if any(G[0][0] - 900 <= t <= G[-1][0] + 900 for t in gt): continue   # yer izi var: oturumdan gelir
+            kind = 'arr' if G[0][3] > G[-1][3] else 'dep' if G[-1][3] > G[0][3] else None
+            if not kind: continue
+            q = [p for p in G if p[3] <= 1200]
+            q = q[-12:] if kind == 'arr' else q[:12]
+            if len(q) < 3: continue
+            ic = na[1]; ref = ads.setdefault(ic, (round(na[2], 5), round(na[3], 5))); P = proj(ref)
+            css = [p[5] for p in G if p[5]]; call = max(set(css), key=css.count) if css else None
+            tl = q[-1][0] if kind == 'arr' else q[0][0]
+            flights.append({'ad': ic, 'kind': kind, 'cs': call, 'reg': reg, 'type': fleet[reg], 't0': int(tl), 't1': int(tl), 'air': True,
+                            'cells': [], 'end': [[round(v) for v in P(p[1], p[2])] for p in q]})
 print('pass1', len(flights), 'flights at', len(ads), 'airports', round(time.time() - t0), 's', file=sys.stderr)
 # ---- 2. geçiş: zemin (yalnız bu meydanlar)
 bg = {ic: {} for ic in ads}

@@ -26,6 +26,19 @@ for r in csv.reader(open(RWY, encoding='utf-8')):
 def proj(ref):
     la0, lo0 = ref; kx = math.cos(math.radians(la0)) * 111320; ky = 110540
     return lambda la, lo: ((lo - lo0) * kx, (la - la0) * ky)
+def rwy_air(R, q):
+    # hava noktaları: pist ekseninin uzantısına hizalı (yön ±15°, yanal ≤ 300 m)
+    if len(q) < 2: return ''
+    a, b = q[0], q[-1]; vx, vy = b[0] - a[0], b[1] - a[1]; V = math.hypot(vx, vy) or 1; best = None
+    for r in R:
+        ax, ay = r['a']; bx, by = r['b']; dx, dy = bx - ax, by - ay; L = math.hypot(dx, dy) or 1
+        c = (vx * dx + vy * dy) / V / L
+        if abs(c) < 0.966: continue
+        lat = max(abs(((p[0] - ax) * dy - (p[1] - ay) * dx) / L) for p in q)
+        if lat > 300: continue
+        if best is None or lat < best[0]: best = (lat, r, c > 0)
+    if not best: return ''
+    return best[1]['le'] if best[2] else best[1]['he']
 def rwy_of(R, q):
     if len(q) < 2: return ''
     a, b = q[0], q[-1]; vx, vy = b[0] - a[0], b[1] - a[1]; m = q[len(q) // 2]; best = None
@@ -52,7 +65,7 @@ for ic, a in ads.items():
     bb = [q(xs, .005) - 200, q(xs, .995) + 200, q(ys, .005) - 200, q(ys, .995) + 200]
     fl = {}
     for cs, L in a['fl'].items():
-        fl[cs] = [{'day': f['day'], 'kind': f['kind'], 'reg': f['reg'], 'type': f['type'], 't0': f['t0'], 't1': f['t1'], 'rwy': rwy_of(R, f['end']), 'cells': f['cells']} for f in sorted(L, key=lambda f: f['t0'])]
+        fl[cs] = [{'day': f['day'], 'kind': f['kind'], 'reg': f['reg'], 'type': f['type'], 't0': f['t0'], 't1': f['t1'], 'rwy': (rwy_air if f.get('air') else rwy_of)(R, f['end']), 'cells': f['cells'], **({'air': 1} if f.get('air') else {})} for f in sorted(L, key=lambda f: f['t0'])]
     out = {'ad': ic, 'ref': a['ref'], 'cell': 8, 'bgcell': BGC, 'days': sorted(a['days']), 'rw': R, 'bb': bb, 'bg': bg, 'fl': fl}
     json.dump(out, open(os.path.join(SITE, 'ad', ic + '.json'), 'w'), separators=(',', ':'))
     index['ads'][ic] = {cs: {'dep': sum(f['kind'] == 'dep' for f in L), 'arr': sum(f['kind'] == 'arr' for f in L)} for cs, L in fl.items()}

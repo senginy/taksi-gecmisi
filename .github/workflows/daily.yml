@@ -7,6 +7,10 @@ on:
       day:
         description: 'Tek gün (YYYY-MM-DD); boş bırakılırsa son 10 günün eksikleri'
         required: false
+      rebuild:
+        description: 'Son 10 günü baştan işle (state silinir)'
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
@@ -24,7 +28,7 @@ jobs:
       - name: Önceki günleri yükle (state dalı)
         run: |
           mkdir -p work/days
-          if git ls-remote --exit-code origin state >/dev/null; then git fetch --depth 1 origin state && git archive FETCH_HEAD | tar -x -C work/days; fi
+          if [ "${{ inputs.rebuild }}" != "true" ] && git ls-remote --exit-code origin state >/dev/null; then git fetch --depth 1 origin state && git archive FETCH_HEAD | tar -x -C work/days; fi
           ls work/days || true
       - name: Günleri işle
         run: scripts/run_days.sh work/days "${{ inputs.day }}"
