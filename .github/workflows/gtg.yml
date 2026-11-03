@@ -17,8 +17,7 @@ jobs:
         if: ${{ inputs.mode == 'probe' }}
         run: |
           D=$(date -u +%Y%m%d); Y=$(date -u -d yesterday +%Y%m%d)
-          for u in https://nomads.ncep.noaa.gov/pub/data/nccf/com/wafs/prod/ https://nomads.ncep.noaa.gov/ ; do echo "== $u"; curl -sS -m 30 -o /tmp/o -w '%{http_code}\n' "$u" || true; head -c 400 /tmp/o; echo; done
-          for b in noaa-gfs-bdp-pds noaa-wafs-pds noaa-nws-wafs-pds; do echo "== s3 $b"; curl -sS -m 30 "https://$b.s3.amazonaws.com/?list-type=2&max-keys=20&delimiter=/" | head -c 1200; echo; done
-          echo "== gfs atmos list"; curl -sS -m 30 "https://noaa-gfs-bdp-pds.s3.amazonaws.com/?list-type=2&prefix=gfs.$Y/00/&delimiter=/" | grep -o '<Prefix>[^<]*</Prefix>' | head
-          curl -sS -m 30 "https://noaa-gfs-bdp-pds.s3.amazonaws.com/?list-type=2&prefix=gfs.$Y/00/atmos/&max-keys=1000" | grep -o '<Key>[^<]*wafs[^<]*</Key>' | head -40
-          curl -sS -m 30 "https://noaa-gfs-bdp-pds.s3.amazonaws.com/?list-type=2&prefix=gfs.$Y/00/wafs/&max-keys=60" | grep -o '<Key>[^<]*</Key>' | head -60
+          echo "== nco scripts"; for f in jobs/JWAFS_GRIB2_0P25_BLENDING jobs/JWAFS_GRIB2_0P25 scripts/exwafs_grib2_0p25_blending.sh scripts/exwafs_grib2_0p25.sh; do echo "--- $f"; curl -sS -m 30 https://www.nco.ncep.noaa.gov/pmb/codes/nwprod/wafs.v7.0.2/$f | grep -iE 'COMOUT|COMIN|grib2|blended|unblended|awf|\.grib2' | head -25; done
+          B=https://nomads.ncep.noaa.gov/pub/data/nccf/com/wafs/prod
+          for DD in $D $Y; do for H in 00 06 12 18; do for u in "wafs.$DD/$H/grib2/0p25/blending/WAFS_0p25_blended_${DD}${H}f012.grib2" "wafs.$DD/$H/grib2/0p25/WAFS_0p25_unblended_${DD}${H}f012.grib2" "wafs.$DD/$H/grib2/0p25/gfs.t${H}z.awf_0p25.f012.grib2" "wafs.$DD/$H/grib2/0p25/blending/" "wafs.$DD/$H/"; do echo "$(curl -s -I -m 20 -o /dev/null -w '%{http_code} %{size_download}' $B/$u) $u"; done; done; done
+          echo "== cgi"; curl -s -m 20 -o /dev/null -w '%{http_code}\n' "https://nomads.ncep.noaa.gov/cgi-bin/filter_wafs_0p25.pl"; curl -s -m 20 https://nomads.ncep.noaa.gov/ | grep -io 'wafs[^"<]*' | sort -u | head -20
