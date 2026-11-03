@@ -39,14 +39,18 @@ def ti1(F, lat, lon):
         VWS = np.hypot(F[('u', Lb)] - F[('u', La)], F[('v', Lb)] - F[('v', La)]) / dz
         res[L] = VWS * DEF * 1e7
     return res
-d, h = latest_run(); steps = list(range(int(os.environ.get('S0', 0)), int(os.environ.get('S1', 48)) + 1, 3))
-meta = {'src': 'ECMWF IFS open data (CC BY 4.0)', 'index': 'Ellrod TI1 x1e7 (VWS*DEF)', 'run': f'{d}{h:02d}', 'steps': steps, 'levels_hpa': OUTL, 'grid': {'lat0': 90, 'lon0': -180, 'd': 0.5, 'nlat': 361, 'nlon': 720}, 'scale': 0.1}
-os.makedirs('out', exist_ok=True); buf = bytearray()
+d, h = latest_run(); steps = list(range(int(os.environ.get('S0', 0)), int(os.environ.get('S1', 60)) + 1, 3))
+TS = 30; N = int(TS / 0.5)   # 30°x30° karo, 0.5° ızgara -> 60x60
+meta = {'src': 'ECMWF IFS open data (CC BY 4.0)', 'index': 'Ellrod TI1 x1e7 (VWS*DEF)', 'run': f'{d}{h:02d}', 'steps': steps, 'levels_hpa': OUTL, 'tile': TS, 'd': 0.5, 'n': N, 'scale': 0.1, 'layout': 'tile t{r}_{c}: lat 90-30r..., lon -180+30c...; [step][level][60][60] uint8'}
+os.makedirs('out', exist_ok=True)
+tiles = {(r, c): bytearray() for r in range(6) for c in range(12)}
 for s in steps:
     F, lat, lon = fetch(d, h, s); T = ti1(F, lat, lon)
     for L in OUTL:
-        g = T[L][::2, ::2]
-        buf += np.clip(np.round(g / 0.1), 0, 255).astype(np.uint8).tobytes()
+        g = np.clip(np.round(T[L][::2, ::2][:360, :720] / 0.1), 0, 255).astype(np.uint8)   # 360x720 (90..-89.5, -180..179.5)
+        for (r, c), b in tiles.items(): b += g[r * N:(r + 1) * N, c * N:(c + 1) * N].tobytes()
     print('step', s, {L: round(float(np.percentile(T[L], 99)), 1) for L in OUTL}, flush=True)
-open('out/ti.bin.gz', 'wb').write(gzip.compress(bytes(buf), 6)); json.dump(meta, open('out/meta.json', 'w'))
-print('bytes', len(buf), os.path.getsize('out/ti.bin.gz'))
+tot = 0
+for (r, c), b in tiles.items():
+    z = gzip.compress(bytes(b), 6); open(f'out/t{r}_{c}.bin.gz', 'wb').write(z); tot += len(z)
+json.dump(meta, open('out/meta.json', 'w')); print('tiles', len(tiles), 'gz total', tot)

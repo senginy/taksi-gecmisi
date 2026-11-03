@@ -1,9 +1,12 @@
 name: turb
 on:
+  schedule:
+    - cron: '40 8 * * *'
+    - cron: '40 20 * * *'
   workflow_dispatch:
     inputs:
       s0: {default: '0'}
-      s1: {default: '48'}
+      s1: {default: '60'}
 permissions:
   contents: write
 jobs:
@@ -13,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pip install -q eccodes cfgrib xarray numpy
-      - run: S0=${{ inputs.s0 }} S1=${{ inputs.s1 }} python3 turb/build.py
+      - run: S0=${{ inputs.s0 || '0' }} S1=${{ inputs.s1 || '60' }} python3 turb/build.py
       - name: publish to turb branch
         run: |
           cd out && git init -q && git checkout -q -b turb && git add -A
