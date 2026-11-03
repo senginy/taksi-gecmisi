@@ -1,0 +1,25 @@
+name: turb
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        default: probe
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: probe
+        run: |
+          D=$(date -u +%Y%m%d)
+          for u in https://data.ecmwf.int/forecasts/ "https://data.ecmwf.int/forecasts/$D/" "https://data.ecmwf.int/forecasts/$D/00z/ifs/0p25/oper/"; do echo "== $u $(curl -s -o /tmp/o -w '%{http_code}' -m 30 $u)"; grep -o 'href="[^"]*"' /tmp/o | head -30; done
+          F="https://data.ecmwf.int/forecasts/$D/00z/ifs/0p25/oper/${D}000000-12h-oper-fc"
+          echo "== index $(curl -s -o /tmp/i -w '%{http_code}' -m 30 $F.index)"; wc -l /tmp/i; grep -E '"levtype": "pl"' /tmp/i | grep -E '"param": "(u|v|t|gh|w)"' | grep -E '"levelist": "(150|200|250|300)"' | head -20
+          echo "== s3 $(curl -s -o /tmp/s -w '%{http_code}' -m 30 "https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com/?list-type=2&prefix=$D/00z/ifs/0p25/oper/&max-keys=10")"; head -c 800 /tmp/s; echo
+          L=$(grep -E '"param": "u"' /tmp/i | grep '"levelist": "250"' | head -1); echo "LINE $L"
+          O=$(echo "$L" | python3 -c 'import sys,json;d=json.loads(sys.stdin.read());print(d["_offset"],d["_length"])'); set -- $O
+          echo "== range $(curl -s -o /tmp/u250.grib2 -w '%{http_code} %{size_download}' -r $1-$(( $1 + $2 - 1 )) $F.grib2)"
+          pip install -q eccodes cfgrib xarray 2>&1 | tail -1
+          python3 -c "import xarray as xr; ds=xr.open_dataset('/tmp/u250.grib2',engine='cfgrib'); print(ds)"
