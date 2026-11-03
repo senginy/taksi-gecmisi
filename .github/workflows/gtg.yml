@@ -16,14 +16,9 @@ jobs:
       - name: probe
         if: ${{ inputs.mode == 'probe' }}
         run: |
-          set -x
-          D=$(date -u +%Y%m%d)
-          curl -s https://nomads.ncep.noaa.gov/pub/data/nccf/com/ | grep -o 'href="[^"]*"' | head -60
-          curl -s https://nomads.ncep.noaa.gov/pub/data/nccf/com/wafs/prod/ | grep -o 'href="[^"]*"' | tail -10
-          L=$(curl -s https://nomads.ncep.noaa.gov/pub/data/nccf/com/wafs/prod/ | grep -o 'wafs\.[0-9]*' | sort -u | tail -1)
-          echo "LATEST $L"
-          curl -s https://nomads.ncep.noaa.gov/pub/data/nccf/com/wafs/prod/$L/ | grep -o 'href="[^"]*"'
-          H=$(curl -s https://nomads.ncep.noaa.gov/pub/data/nccf/com/wafs/prod/$L/ | grep -o '>[0-9][0-9]/<' | tr -d '<>/' | tail -1)
-          echo "HOUR $H"
-          curl -s https://nomads.ncep.noaa.gov/pub/data/nccf/com/wafs/prod/$L/$H/ | grep -o 'href="[^"]*"'
-          for s in grib2 grib2/0p25 grib2/0p25/blending grib2/1p25; do echo "== $s"; curl -s https://nomads.ncep.noaa.gov/pub/data/nccf/com/wafs/prod/$L/$H/$s/ | grep -o 'href="[^"]*"' | head -40; done
+          D=$(date -u +%Y%m%d); Y=$(date -u -d yesterday +%Y%m%d)
+          for u in https://nomads.ncep.noaa.gov/pub/data/nccf/com/wafs/prod/ https://nomads.ncep.noaa.gov/ ; do echo "== $u"; curl -sS -m 30 -o /tmp/o -w '%{http_code}\n' "$u" || true; head -c 400 /tmp/o; echo; done
+          for b in noaa-gfs-bdp-pds noaa-wafs-pds noaa-nws-wafs-pds; do echo "== s3 $b"; curl -sS -m 30 "https://$b.s3.amazonaws.com/?list-type=2&max-keys=20&delimiter=/" | head -c 1200; echo; done
+          echo "== gfs atmos list"; curl -sS -m 30 "https://noaa-gfs-bdp-pds.s3.amazonaws.com/?list-type=2&prefix=gfs.$Y/00/&delimiter=/" | grep -o '<Prefix>[^<]*</Prefix>' | head
+          curl -sS -m 30 "https://noaa-gfs-bdp-pds.s3.amazonaws.com/?list-type=2&prefix=gfs.$Y/00/atmos/&max-keys=1000" | grep -o '<Key>[^<]*wafs[^<]*</Key>' | head -40
+          curl -sS -m 30 "https://noaa-gfs-bdp-pds.s3.amazonaws.com/?list-type=2&prefix=gfs.$Y/00/wafs/&max-keys=60" | grep -o '<Key>[^<]*</Key>' | head -60
