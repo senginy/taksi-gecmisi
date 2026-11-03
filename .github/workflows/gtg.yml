@@ -1,0 +1,29 @@
+name: gtg
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: probe | build
+        default: probe
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: probe
+        if: ${{ inputs.mode == 'probe' }}
+        run: |
+          set -x
+          D=$(date -u +%Y%m%d)
+          curl -s https://nomads.ncep.noaa.gov/pub/data/nccf/com/ | grep -o 'href="[^"]*"' | head -60
+          curl -s https://nomads.ncep.noaa.gov/pub/data/nccf/com/wafs/prod/ | grep -o 'href="[^"]*"' | tail -10
+          L=$(curl -s https://nomads.ncep.noaa.gov/pub/data/nccf/com/wafs/prod/ | grep -o 'wafs\.[0-9]*' | sort -u | tail -1)
+          echo "LATEST $L"
+          curl -s https://nomads.ncep.noaa.gov/pub/data/nccf/com/wafs/prod/$L/ | grep -o 'href="[^"]*"'
+          H=$(curl -s https://nomads.ncep.noaa.gov/pub/data/nccf/com/wafs/prod/$L/ | grep -o '>[0-9][0-9]/<' | tr -d '<>/' | tail -1)
+          echo "HOUR $H"
+          curl -s https://nomads.ncep.noaa.gov/pub/data/nccf/com/wafs/prod/$L/$H/ | grep -o 'href="[^"]*"'
+          for s in grib2 grib2/0p25 grib2/0p25/blending grib2/1p25; do echo "== $s"; curl -s https://nomads.ncep.noaa.gov/pub/data/nccf/com/wafs/prod/$L/$H/$s/ | grep -o 'href="[^"]*"' | head -40; done
