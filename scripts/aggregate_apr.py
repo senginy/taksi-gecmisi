@@ -4,7 +4,8 @@ Kullanım: aggregate_apr.py <yaklaşma gün klasörü> <site klasörü> <runways
 Her iniş için: iniş pisti (teker koyma noktası + son noktaların yönü), eşiğe kalan iz mesafesi (d),
 süzülüşün başladığı nokta (geriye doğru ilk düz uçuş: 0,8 NM'de 120 ft'ten az alçalma) ve
 yalnız finalde (pist uzantısında, yanal ≤ 1500 m, eşiğe ≤ 12 NM) ve süzülüşteyken 3°'den sapma
-(eşikte 50 ft, 318,4 ft/NM). LTFM yazılmaz (ana üs)."""
+(eşikte 50 ft, 318,4 ft/NM). Yükseklik, eşiği geçtikten sonraki en alçak hava noktasına göre yeniden sıfırlanır.
+LTFM yazılmaz (ana üs)."""
 import sys, os, glob, json, math, csv, time
 DAYS, SITE, RWY = sys.argv[1:4]; N = int(sys.argv[4]) if len(sys.argv) > 4 else 10
 SKIP = {'LTFM'}
@@ -63,6 +64,12 @@ for ic, a in ads.items():
             lb = landing(R, f); pts = f['pts']
             off = lb[4] / 1852 if lb else 0.0
             dd = [p[3] - off for p in pts]
+            # yükseklik düzeltmesi: ADS-B "yerde" bayrağı çoğu zaman teker koymadan birkaç saniye sonra gelir; pist üstündeki
+            # (eşiği geçmiş) en alçak hava noktası yer seviyesi kabul edilir
+            over = [p[2] for p, x in zip(pts, dd) if x <= 0]
+            if over:
+                hz = max(-100, min(400, min(over)))
+                pts = [[p[0], p[1], p[2] - hz] + p[3:] for p in pts]
             # süzülüş başlangıcı: eşikten geriye, 0,8 NM'de 120 ft'ten az alçalınan ilk yer
             g = 0
             for i in range(len(pts) - 1, -1, -1):
