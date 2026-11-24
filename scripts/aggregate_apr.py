@@ -9,7 +9,7 @@ LTFM yazılmaz (ana üs)."""
 import sys, os, glob, json, math, csv, time
 DAYS, SITE, RWY = sys.argv[1:4]; N = int(sys.argv[4]) if len(sys.argv) > 4 else 10
 SKIP = {'LTFM'}
-BGC = 250
+BGC = 500
 files = sorted(glob.glob(os.path.join(DAYS, '*.json')))[-N:]
 ads = {}
 for fn in files:
@@ -103,7 +103,7 @@ for ic, a in ads.items():
             out.append({'day': f['day'], 'reg': f['reg'], 'type': f['type'], 't': f['t'], 'rwy': lb[1] if lb else '', 'ga': 1 if f.get('ga') else 0, 'j': jn, 'pts': P2})
         fl[cs] = out
     mx = max(a['bg'].values() or [1])
-    bg = [[x, y, max(1, min(9, round(9 * math.log(c + 1) / math.log(mx + 1))))] for (x, y), c in a['bg'].items() if c > 2]
+    bg = [[x, y, max(1, min(9, round(9 * math.log(c + 1) / math.log(mx + 1))))] for (x, y), c in a["bg"].items() if c > 3]
     outj = {'ad': ic, 'ref': a['ref'], 'elev': a['elev'], 'days': sorted(a['days']), 'rw': [{k: v for k, v in r.items() if k not in ('ld', 'hd')} for r in R], 'bgcell': BGC, 'bg': bg, 'fl': fl}
     json.dump(outj, open(os.path.join(SITE, 'apr', ic + '.json'), 'w'), separators=(',', ':'))
     index['ads'][ic] = {cs: len(L) for cs, L in fl.items()}
