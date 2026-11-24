@@ -5,6 +5,7 @@ Her iniş için: iniş pisti (teker koyma noktası + son noktaların yönü), e�
 finale katılış noktası, süzülüşün başladığı nokta (geriye doğru ilk düz uçuş: 0,8 NM'de 120 ft'ten az alçalma) ve
 yalnız finalde (pist uzantısında, yanal ≤ 1500 m, eşiğe ≤ 12 NM) ve süzülüşteyken 3°'den sapma
 (eşikte 50 ft, 318,4 ft/NM). Yükseklik, eşiği geçtikten sonraki en alçak hava noktasına göre yeniden sıfırlanır.
+Yer izi olmayan inişlerde (ng) pist üstünde nokta yoksa yükseklik kaba kalır: cal=0, sapma hesaplanmaz.
 LTFM yazılmaz (ana üs)."""
 import sys, os, glob, json, math, csv, time
 DAYS, SITE, RWY = sys.argv[1:4]; N = int(sys.argv[4]) if len(sys.argv) > 4 else 10
@@ -35,7 +36,7 @@ def proj(ref):
 def fnum(v):
     try: return float(v)
     except ValueError: return 0.0
-def landing(R, f):
+def landing(R, f, ng=0):
     td = f['td']; q = f['pts'][-6:]
     vx, vy = td[0] - q[0][0], td[1] - q[0][1]; V = math.hypot(vx, vy) or 1; best = None
     for r in R:
@@ -44,7 +45,7 @@ def landing(R, f):
             if (vx * ux + vy * uy) / V < 0.94: continue
             Tx, Ty = T[0] + ux * dsp, T[1] + uy * dsp          # eşik (kaydırılmış eşik dahil)
             along = (td[0] - Tx) * ux + (td[1] - Ty) * uy; lat = abs(-(td[0] - Tx) * uy + (td[1] - Ty) * ux)
-            if lat > 120 or along < -300 or along > L: continue
+            if lat > (250 if ng else 120) or along < (-4000 if ng else -300) or along > L: continue
             if best is None or lat < best[0]: best = (lat, name, (Tx, Ty), (ux, uy), along)
     return best
 os.makedirs(os.path.join(SITE, 'apr'), exist_ok=True)
@@ -61,14 +62,16 @@ for ic, a in ads.items():
     for cs, L in a['fl'].items():
         out = []
         for f in sorted(L, key=lambda f: f['t']):
-            lb = landing(R, f); pts = f['pts']
+            ng = f.get('ng', 0); lb = landing(R, f, ng); pts = f['pts']
             off = lb[4] / 1852 if lb else 0.0
             dd = [p[3] - off for p in pts]
             # yükseklik düzeltmesi: ADS-B "yerde" bayrağı çoğu zaman teker koymadan birkaç saniye sonra gelir; pist üstündeki
             # (eşiği geçmiş) en alçak hava noktası yer seviyesi kabul edilir
             over = [p[2] for p, x in zip(pts, dd) if x <= 0]
+            cal = 1 if (over or not ng) else 0              # yer izi yok ve pist üstünde nokta yok: yükseklik kaba, sapma/profil yok
             if over:
-                hz = max(-100, min(400, min(over)))
+                lim = 700 if ng else 400                    # yer izi yoksa barometrik sapma büyük olabilir
+                hz = max(-lim if ng else -100, min(lim, min(over)))
                 pts = [[p[0], p[1], p[2] - hz] + p[3:] for p in pts]
             # süzülüş başlangıcı: eşikten geriye, 0,8 NM'de 120 ft'ten az alçalınan ilk yer
             g = 0
@@ -81,7 +84,7 @@ for ic, a in ads.items():
             P2 = []
             for i, p in enumerate(pts):
                 dev = None
-                if lb and i >= g:
+                if lb and cal and i >= g:
                     _, _, T, (ux, uy), _ = lb
                     al = -((p[0] - T[0]) * ux + (p[1] - T[1]) * uy); lt = abs(-(p[0] - T[0]) * uy + (p[1] - T[1]) * ux)
                     if 0 < al < 12 * 1852 and lt < 1500: dev = round(p[2] - (50 + 318.4 * al / 1852))
@@ -100,7 +103,7 @@ for ic, a in ads.items():
                 if k0:                                   # 0: iz zaten finalde başlıyor, katılış görünmüyor
                     p = P2[k0]; al = -((p[0] - T[0]) * ux + (p[1] - T[1]) * uy)
                     if al > 1852: jn = [p[0], p[1], p[2], round(al / 1852, 1)]
-            out.append({'day': f['day'], 'reg': f['reg'], 'type': f['type'], 't': f['t'], 'rwy': lb[1] if lb else '', 'ga': 1 if f.get('ga') else 0, 'j': jn, 'pts': P2})
+            out.append({'day': f['day'], 'reg': f['reg'], 'type': f['type'], 't': f['t'], 'rwy': lb[1] if lb else '', 'ga': 1 if f.get('ga') else 0, 'j': jn, 'cal': cal, 'pts': P2})
         fl[cs] = out
     mx = max(a['bg'].values() or [1])
     bg = [[x, y, max(1, min(9, round(9 * math.log(c + 1) / math.log(mx + 1))))] for (x, y), c in a["bg"].items() if c > 3]
