@@ -6,8 +6,9 @@ mkdir -p "$DAYS"
 curl -sL -o /tmp/airports.csv https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv
 curl -sL -o /tmp/runways.csv https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/runways.csv
 if [ -n "$ONE" ]; then LIST=$ONE; else LIST=$(for i in $(seq 10 -1 1); do date -u -d "$i days ago" +%Y-%m-%d; done); fi
+mkdir -p "$DAYS/apr"
 for D in $LIST; do
-  [ -s "$DAYS/$D.json" ] && continue
+  [ -s "$DAYS/$D.json" ] && [ -s "$DAYS/apr/$D.json" ] && continue
   T=v${D//-/.}-planes-readsb-prod-0
   U=https://github.com/adsblol/globe_history_${D:0:4}/releases/download/$T/$T.tar
   rm -f /tmp/day.tar; n=0
@@ -16,8 +17,10 @@ for D in $LIST; do
     curl -sL --retry 5 --retry-delay 5 "$U.$s" >> /tmp/day.tar && n=$((n+1))
   done
   if [ "$n" = 0 ]; then echo "$D: arşiv yok (henüz yayımlanmamış olabilir)"; continue; fi
-  python3 scripts/process_day.py /tmp/day.tar "$D" "$DAYS/$D.json" data/fleet.json /tmp/airports.csv || rm -f "$DAYS/$D.json"
+  [ -s "$DAYS/$D.json" ] || python3 scripts/process_day.py /tmp/day.tar "$D" "$DAYS/$D.json" data/fleet.json /tmp/airports.csv || rm -f "$DAYS/$D.json"
+  [ -s "$DAYS/apr/$D.json" ] || python3 scripts/approach_day.py /tmp/day.tar "$D" "$DAYS/apr/$D.json" data/fleet.json /tmp/airports.csv || rm -f "$DAYS/apr/$D.json"
   rm -f /tmp/day.tar
 done
 # 10 günden eskileri at
 ls "$DAYS"/*.json 2>/dev/null | sort | head -n -10 | xargs -r rm -f
+ls "$DAYS"/apr/*.json 2>/dev/null | sort | head -n -10 | xargs -r rm -f

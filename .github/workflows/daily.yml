@@ -19,7 +19,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 340
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -36,6 +36,7 @@ jobs:
         run: |
           mkdir -p site && cp web/* site/ 2>/dev/null || true
           python3 scripts/aggregate.py work/days site /tmp/runways.csv 10
+          python3 scripts/aggregate_apr.py work/days/apr site /tmp/runways.csv 10
           touch site/.nojekyll
       - name: State dalını güncelle
         run: |
