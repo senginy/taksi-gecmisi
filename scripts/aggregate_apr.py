@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Son N günün yaklaşma dosyalarını meydan bazında birleştirir: site/apr/index.json ve site/apr/<ICAO>.json.
+"""Son N günün yaklaşma dosyalarını (son 6000 ft) meydan bazında birleştirir: site/apr/index.json ve site/apr/<ICAO>.json.
 Kullanım: aggregate_apr.py <yaklaşma gün klasörü> <site klasörü> <runways.csv> [N=10]
 Her iniş için: iniş pisti (teker koyma noktası + son noktaların yönü), eşiğe kalan iz mesafesi (d),
-süzülüşün başladığı nokta (geriye doğru ilk düz uçuş: 0,8 NM'de 120 ft'ten az alçalma) ve
+finale katılış noktası, süzülüşün başladığı nokta (geriye doğru ilk düz uçuş: 0,8 NM'de 120 ft'ten az alçalma) ve
 yalnız finalde (pist uzantısında, yanal ≤ 1500 m, eşiğe ≤ 12 NM) ve süzülüşteyken 3°'den sapma
 (eşikte 50 ft, 318,4 ft/NM). Yükseklik, eşiği geçtikten sonraki en alçak hava noktasına göre yeniden sıfırlanır.
 LTFM yazılmaz (ana üs)."""
@@ -86,7 +86,21 @@ for ic, a in ads.items():
                     al = -((p[0] - T[0]) * ux + (p[1] - T[1]) * uy); lt = abs(-(p[0] - T[0]) * uy + (p[1] - T[1]) * ux)
                     if 0 < al < 12 * 1852 and lt < 1500: dev = round(p[2] - (50 + 318.4 * al / 1852))
                 P2.append([p[0], p[1], p[2], round(dd[i], 2), dev])
-            out.append({'day': f['day'], 'reg': f['reg'], 'type': f['type'], 't': f['t'], 'rwy': lb[1] if lb else '', 'ga': 1 if f.get('ga') else 0, 'pts': P2})
+            # finale katılış: eşikten geriye, pist ekseninde (yanal ≤ max(250 m, along'un %4'ü)) ve pist yönünde (±15°) kalınan kesintisiz kısmın başı
+            jn = None
+            if lb:
+                _, _, T, (ux, uy), _ = lb; k0 = None
+                for i in range(len(P2) - 1, 0, -1):
+                    p, q = P2[i - 1], P2[i]
+                    al = -((p[0] - T[0]) * ux + (p[1] - T[1]) * uy); lt = abs(-(p[0] - T[0]) * uy + (p[1] - T[1]) * ux)
+                    if al <= 0: continue
+                    sx, sy = q[0] - p[0], q[1] - p[1]; L = math.hypot(sx, sy)
+                    if lt > max(250, 0.04 * al) or (L > 30 and (sx * ux + sy * uy) / L < 0.966): break
+                    k0 = i - 1
+                if k0:                                   # 0: iz zaten finalde başlıyor, katılış görünmüyor
+                    p = P2[k0]; al = -((p[0] - T[0]) * ux + (p[1] - T[1]) * uy)
+                    if al > 1852: jn = [p[0], p[1], p[2], round(al / 1852, 1)]
+            out.append({'day': f['day'], 'reg': f['reg'], 'type': f['type'], 't': f['t'], 'rwy': lb[1] if lb else '', 'ga': 1 if f.get('ga') else 0, 'j': jn, 'pts': P2})
         fl[cs] = out
     mx = max(a['bg'].values() or [1])
     bg = [[x, y, max(1, min(9, round(9 * math.log(c + 1) / math.log(mx + 1))))] for (x, y), c in a['bg'].items() if c > 2]
